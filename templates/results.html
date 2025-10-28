@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>擷取結果 - {{ keyword }}</title>
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css"
+    />
+    <style>
+      body {
+        background-color: #f5f5f5;
+      }
+      .header-section {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 30px 0;
+        margin-bottom: 30px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      }
+      .chart-container {
+        background-color: white;
+        padding: 30px;
+        border-radius: 15px;
+        margin: 30px 0;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      }
+      .chart-container img {
+        max-width: 100%;
+        height: auto;
+        display: block;
+        margin: 20px auto;
+      }
+      .table-container {
+        background-color: white;
+        padding: 30px;
+        border-radius: 15px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        margin-bottom: 30px;
+      }
+      .btn-action {
+        padding: 10px 25px;
+        font-weight: bold;
+        border-radius: 8px;
+      }
+      .stats-badge {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 5px 15px;
+        border-radius: 20px;
+        font-weight: bold;
+      }
+      .filter-section {
+        background-color: white;
+        padding: 20px;
+        border-radius: 15px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        margin-bottom: 20px;
+      }
+      /* 🔧 新增：排除行的樣式 */
+      tr.excluded {
+        text-decoration: line-through;
+        background-color: #f8f9fa !important;
+        color: #6c757d;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="header-section">
+      <div class="container">
+        <h3 class="mb-2">🔍 關鍵字：「{{ keyword }}」</h3>
+        <p class="mb-0 lead">
+          共擷取到 <span class="stats-badge">{{ count }}</span> 筆新聞。
+        </p>
+      </div>
+    </div>
+
+    <div class="container pb-5">
+      <!-- 按鈕區 -->
+      <div class="mb-4">
+        <a
+          class="btn btn-success btn-action me-2"
+          href="/download/{{ file_name }}"
+        >
+          📁 下載 Excel
+        </a>
+        <!-- 🔧 新增：清除篩選按鈕 -->
+        <a id="reset-filters-btn"
+          class="btn btn-warning btn-action me-2" style="display: none;">
+          🔄 清除篩選
+        </a>
+        <a class="btn btn-secondary btn-action" href="/"> ↩ 回首頁 </a>
+      </div>
+
+      <!-- 新聞來源篩選器 -->
+      <div class="filter-section">
+        <h5 class="mb-3">🔍 新聞來源篩選</h5>
+        <div class="row">
+          {% for source in sources %}
+          <div class="col-md-3 mb-2">
+            <div class="form-check">
+              <input
+                class="form-check-input"
+                type="checkbox"
+                value="{{ source }}"
+                id="source-{{ loop.index }}"
+                checked
+              />
+              <label class="form-check-label" for="source-{{ loop.index }}">
+                {{ source }}
+              </label>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <!-- 新聞列表（放在上方） -->
+      <div class="table-container">
+        <h5 class="mb-4">🗞️ 新聞列表</h5>
+        <div class="table-responsive">
+          <table class="table table-striped table-hover">
+            <thead class="table-dark">
+              <tr>
+                <th style="width: 45%">標題</th>
+                <th style="width: 15%">來源</th>
+                <th style="width: 20%">發布時間</th>
+                <th style="width: 15%">情感分析</th>
+                <th style="width: 5%">操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for item in results %}
+              <tr data-source="{{ item['來源'] }}" data-id="{{ loop.index0 }}">
+                <td>
+                  <a
+                    href="{{ item['連結'] }}"
+                    target="_blank"
+                    class="text-decoration-none"
+                  >
+                    {{ item['標題'] }}
+                  </a>
+                </td>
+                <td>{{ item['來源'] }}</td>
+                <td>{{ item['發布時間'] }}</td>
+                <td>
+                  {% if item.get('情感分類') %} {% if item['情感分類'] == '正面'
+                  %}
+                  <span class="badge bg-success">😊 正面</span>
+                  {% elif item['情感分類'] == '負面' %}
+                  <span class="badge bg-danger">😞 負面</span>
+                  {% elif item['情感分類'] == '中立' %}
+                  <span class="badge bg-warning">😐 中立</span>
+                  {% else %}
+                  <span class="badge bg-secondary">❓ 未知</span>
+                  {% endif %} {% endif %}
+                </td>
+                <td>
+                  <button class="btn btn-sm btn-outline-secondary toggle-exclude" title="從分析中排除/恢復">
+                    👁️
+                  </button>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- 視覺化圖表區塊 -->
+      <div class="row">
+        <!-- 情感分析圖表 -->
+        {% if sentiment_chart_data %}
+        <div class="col-lg-6 mb-4">
+          <div class="chart-container h-100">
+            <h5 class="text-center mb-4">💭 新聞情感分析分佈</h5>
+            <canvas id="sentimentBarChart"></canvas>
+            {% if sentiment_stats %}
+            <div class="row mt-3">
+              {% for sentiment, count in sentiment_stats.items() %}
+              <div class="col-4 text-center">
+                {% if sentiment == '正面' %}
+                <div class="alert alert-success p-2 mb-0">
+                  <strong>😊 正面</strong><br /><span style="font-size: 1.2em">{{ count }}</span> 篇
+                </div>
+                {% elif sentiment == '負面' %}
+                <div class="alert alert-danger p-2 mb-0">
+                  <strong>😞 負面</strong><br /><span style="font-size: 1.2em">{{ count }}</span> 篇
+                </div>
+                {% elif sentiment == '中立' %}
+                <div class="alert alert-warning p-2 mb-0">
+                  <strong>😐 中立</strong><br /><span style="font-size: 1.2em">{{ count }}</span> 篇
+                </div>
+                {% endif %}
+              </div>
+              {% endfor %}
+            </div>
+            {% endif %}
+          </div>
+        </div>
+        {% endif %}
+
+        <!-- 圓餅圖統計 -->
+        {% if pie_chart_data %}
+        <div class="col-lg-6 mb-4">
+          <div class="chart-container h-100">
+            <h5 class="text-center mb-4">📊 各新聞來源篇數統計</h5>
+            <!-- 🔧 修改：使用 canvas 元素取代 img -->
+            <canvas id="pieChart"></canvas>
+          </div>
+        </div>
+        {% endif %}
+      </div>
+
+      <!-- 趨勢圖與關鍵字雲區塊 -->
+      <div class="row">
+        <!-- 時間趨勢圖 -->
+        {% if trend_chart_data %}
+        <div class="col-lg-6 mb-4">
+          <div class="chart-container h-100">
+            <h5 class="text-center mb-4">📈 新聞數量時間趨勢</h5>
+            <!-- 🔧 修改：使用 canvas 元素取代 img -->
+            <canvas id="trendLineChart"></canvas>
+          </div>
+        </div>
+        {% endif %}
+
+        <!-- 關鍵字雲 -->
+        {% if wordcloud %}
+        <div class="col-lg-6 mb-4">
+          <div class="chart-container h-100">
+            <h5 class="text-center mb-4">☁️ 關鍵字雲</h5>
+            <img
+              src="{{ url_for('static', filename=wordcloud) }}"
+              class="img-fluid"
+              alt="關鍵字雲"
+              onerror="this.style.display='none'; this.parentElement.innerHTML+='<p class=text-danger text-center>圖表載入失敗</p>'"
+            />
+          </div>
+        </div>
+        {% endif %}
+      </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- 🔧 新增：引入 Chart.js 函式庫 -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- 🔧 新增：引入 Chart.js 數據標籤外掛 -->
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
+    <script>
+      // 🔧 新增：儀表板核心邏輯
+      // 1. 儲存原始數據和圖表實例
+      let allNewsData = {{ results | tojson }};
+      // 為每條新聞增加一個唯一 ID 和一個 isExcluded 狀態
+      allNewsData.forEach((item, index) => {
+        item.uniqueId = index;
+        item.isExcluded = false;
+      });
+
+      let filters = { source: null, sentiment: null, date: null };
+      let pieChart, sentimentBarChart, trendLineChart; // 將圖表實例設為全域變數
+
+      // 2. 統一的儀表板更新函式
+      function updateDashboard() {
+        // 首先排除被手動標記的數據，然後再根據圖表篩選器篩選
+        let activeData = allNewsData.filter(item => !item.isExcluded);
+        let filteredData = activeData.filter(item => {
+          const sourceMatch = !filters.source || item['來源'] === filters.source;
+          const sentimentMatch = !filters.sentiment || item['情感分類'] === filters.sentiment;
+          const dateMatch = !filters.date || item['發布時間'].startsWith(filters.date);
+          return sourceMatch && sentimentMatch && dateMatch;
+        });
+
+        // 更新總筆數
+        document.querySelector('.stats-badge').textContent = filteredData.length;
+
+        // 更新新聞列表
+        const tbody = document.querySelector('tbody');
+        // 我們不再重新生成列表，而是根據篩選結果顯示或隱藏行
+        document.querySelectorAll('tbody tr').forEach(row => {
+          const rowId = parseInt(row.dataset.id, 10);
+          const rowIsVisible = filteredData.some(d => d.uniqueId === rowId);
+          row.style.display = rowIsVisible ? '' : 'none';
+        });
+
+        // 更新圓餅圖
+        if (pieChart) {
+          // 注意：圖表數據來自 activeData，不受圖表篩選器影響，只受手動排除影響
+          const sourceCounts = activeData.reduce((acc, item) => {
+            acc[item['來源']] = (acc[item['來源']] || 0) + 1;
+            return acc;
+          }, {});
+          const sortedSources = Object.entries(sourceCounts).sort((a, b) => b[1] - a[1]);
+          pieChart.data.labels = sortedSources.map(entry => entry[0]);
+          pieChart.data.datasets[0].data = sortedSources.map(entry => entry[1]);
+          pieChart.update();
+        }
+
+        // 更新情感長條圖
+        if (sentimentBarChart) {
+          const sentimentCounts = activeData.reduce((acc, item) => {
+            acc[item['情感分類']] = (acc[item['情感分類']] || 0) + 1;
+            return acc;
+          }, {});
+          sentimentBarChart.data.labels.forEach((label, index) => {
+            sentimentBarChart.data.datasets[0].data[index] = sentimentCounts[label] || 0;
+          });
+          sentimentBarChart.update();
+        }
+
+        // 更新時間趨勢圖
+        if (trendLineChart) {
+          const dateCounts = activeData.reduce((acc, item) => {
+            const date = item['發布時間'].split(' ')[0];
+            acc[date] = (acc[date] || 0) + 1;
+            return acc;
+          }, {});
+          trendLineChart.data.labels.forEach((label, index) => {
+            trendLineChart.data.datasets[0].data[index] = dateCounts[label] || 0;
+          });
+          trendLineChart.update();
+        }
+
+        // 根據是否有篩選條件，顯示/隱藏重設按鈕
+        const hasFilters = Object.values(filters).some(f => f !== null);
+        document.getElementById('reset-filters-btn').style.display = hasFilters ? 'inline-block' : 'none';
+      }
+
+      // 3. 重設篩選的邏輯
+      document.getElementById('reset-filters-btn').addEventListener('click', () => {
+        filters = { source: null, sentiment: null, date: null };
+        // 重設 checkbox 狀態
+        // document.querySelectorAll('.form-check-input').forEach(cb => cb.checked = true);
+        updateDashboard();
+      });
+
+      // 4. 頁面載入時初始化
+      document.addEventListener('DOMContentLoaded', () => {
+        // 為所有排除按鈕綁定事件
+        document.querySelectorAll('.toggle-exclude').forEach(button => {
+          button.addEventListener('click', function() {
+            const row = this.closest('tr');
+            const rowId = parseInt(row.dataset.id, 10);
+            const newsItem = allNewsData.find(d => d.uniqueId === rowId);
+
+            // 切換排除狀態
+            newsItem.isExcluded = !newsItem.isExcluded;
+
+            // 更新視覺樣式
+            row.classList.toggle('excluded', newsItem.isExcluded);
+            this.innerHTML = newsItem.isExcluded ? '🔄' : '👁️';
+
+            // 更新儀表板
+            updateDashboard();
+          });
+        });
+        // 初始繪製所有圖表
+        drawSentimentChart();
+        drawPieChart();
+        drawTrendChart();
+      });
+
+      // 舊的篩選邏輯不再需要，因為 updateDashboard 會處理列表更新
+      /*
+      // 新聞來源篩選邏輯
+      document.querySelectorAll(".form-check-input").forEach((checkbox) => {
+        checkbox.addEventListener("change", function () {
+          const selectedSources = Array.from(
+            document.querySelectorAll(".form-check-input:checked")
+          ).map((el) => el.value);
+          document.querySelectorAll("tbody tr").forEach((row) => {
+            const source = row.getAttribute("data-source");
+            if (selectedSources.includes(source)) {
+              row.style.display = "";
+            } else {
+              row.style.display = "none";
+            }
+          });
+        });
+      });
+      */
+
+      // 🔧 新增：全域註冊 datalabels 外掛
+      Chart.register(ChartDataLabels);
+
+      // 🔧 修改：將繪圖邏輯封裝成函式
+      function drawSentimentChart() {
+      {% if sentiment_chart_data %}
+      const sentimentBarCtx = document.getElementById('sentimentBarChart').getContext('2d');
+      const sentimentChartData = {{ sentiment_chart_data | tojson }};
+      
+      // 定義顏色映射
+      const sentimentColors = {
+        '正面': 'rgba(46, 204, 113, 0.7)',
+        '中立': 'rgba(243, 156, 18, 0.7)',
+        '負面': 'rgba(231, 76, 60, 0.7)',
+        '未知': 'rgba(149, 165, 166, 0.7)'
+      };
+
+      const sentimentBorderColors = {
+        '正面': 'rgb(46, 204, 113)',
+        '中立': 'rgb(243, 156, 18)',
+        '負面': 'rgb(231, 76, 60)',
+        '未知': 'rgb(149, 165, 166)'
+      };
+
+      sentimentBarChart = new Chart(sentimentBarCtx, {
+        type: 'bar',
+        data: {
+          labels: sentimentChartData.labels,
+          datasets: [{
+            label: '新聞數量',
+            data: sentimentChartData.data,
+            backgroundColor: sentimentChartData.labels.map(label => sentimentColors[label]),
+            borderColor: sentimentChartData.labels.map(label => sentimentBorderColors[label]),
+            borderWidth: 1
+          }]
+        },
+        options: {
+          indexAxis: 'y', // 讓長條圖變為水平，標籤更易讀
+          responsive: true,
+          plugins: {
+            // 🔧 新增：在此圖表中明確禁用 datalabels
+            datalabels: {
+              display: false
+            },
+            legend: {
+              display: false // 只有一個數據集，不需要圖例
+            }
+          },
+          onClick: (event, elements) => {
+            if (elements.length > 0) {
+              const clickedIndex = elements[0].index;
+              filters.sentiment = sentimentBarChart.data.labels[clickedIndex];
+              updateDashboard();
+            }
+          }
+        }
+      });
+      {% endif %}
+      }
+
+      // 🔧 修改：將繪圖邏輯封裝成函式
+      function drawPieChart() {
+      {% if pie_chart_data %}
+      const pieChartCtx = document.getElementById('pieChart').getContext('2d');
+      const pieChartData = {{ pie_chart_data | tojson }};
+
+      pieChart = new Chart(pieChartCtx, {
+          type: 'pie',
+          data: {
+              labels: pieChartData.labels,
+              datasets: [{
+                  label: '新聞篇數',
+                  data: pieChartData.data,
+                  backgroundColor: [ // 提供一些預設顏色
+                      '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40',
+                      '#E7E9ED', '#8DDF3C', '#3C8DDF', '#DF3C8D', '#DF8D3C', '#8D3CDF'
+                  ],
+                  hoverOffset: 4
+              }]
+          },
+          options: {
+              responsive: true,
+              maintainAspectRatio: true,
+              plugins: {
+                  // 🔧 新增：設定 datalabels 外掛
+                  datalabels: {
+                      formatter: (value, ctx) => {
+                          // 計算總和
+                          const sum = ctx.chart.data.datasets[0].data.reduce((a, b) => a + b, 0);
+                          // 計算百分比
+                          const percentage = (value * 100 / sum).toFixed(1) + '%';
+                          return percentage;
+                      },
+                      color: '#fff', // 文字顏色
+                      font: {
+                          weight: 'bold',
+                          size: 12,
+                      },
+                      // 增加文字陰影，讓它在淺色背景上更清晰
+                      textShadowBlur: 2,
+                      textShadowColor: 'rgba(0, 0, 0, 0.5)'
+                  },
+                  legend: {
+                      position: 'top',
+                  },
+                  tooltip: {
+                      callbacks: {
+                          label: function(context) {
+                              let label = context.label || '';
+                              if (label) {
+                                  label += ': ';
+                              }
+                              if (context.parsed !== null) {
+                                  label += context.parsed + ' 篇';
+                              }
+                              return label;
+                          }
+                      }
+                  }
+              },
+              // 核心：點擊事件處理
+              onClick: (event, elements) => {
+                  if (elements.length > 0) {
+                      const clickedElementIndex = elements[0].index;
+                      // 更新篩選條件並重繪儀表板
+                      filters.source = pieChart.data.labels[clickedElementIndex];
+                      updateDashboard();
+                  }
+              }
+          }
+      });
+      {% endif %}
+      }
+
+      // 🔧 修改：將繪圖邏輯封裝成函式
+      function drawTrendChart() {
+      {% if trend_chart_data %}
+      const trendLineCtx = document.getElementById('trendLineChart').getContext('2d');
+      const trendChartData = {{ trend_chart_data | tojson }};
+      
+      trendLineChart = new Chart(trendLineCtx, {
+        type: 'line',
+        data: {
+          labels: trendChartData.labels,
+          datasets: [{
+            label: '新聞數量',
+            data: trendChartData.data,
+            borderColor: 'rgb(75, 192, 192)',
+            tension: 0.1, // 讓線條更平滑
+            fill: false, // 不填充線下區域
+            pointRadius: 3, // 點的大小
+            pointBackgroundColor: 'rgb(75, 192, 192)'
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: true,
+          plugins: {
+            datalabels: {
+              display: false // 線圖通常不顯示 datalabels，避免擁擠
+            },
+            legend: {
+              display: false // 只有一個數據集，不需要圖例
+            }
+          },
+          scales: {
+            x: { title: { display: true, text: '日期' } },
+            y: { 
+              title: { display: true, text: '新聞數量' }, 
+              beginAtZero: true,
+              // 🔧 新增：設定 Y 軸刻度
+              ticks: {
+                stepSize: 1, // 強制步長為 1
+                precision: 0 // 不顯示小數點
+              }
+            }
+          },
+          onClick: (event, elements) => {
+            if (elements.length > 0) {
+              const clickedIndex = elements[0].index;
+              filters.date = trendLineChart.data.labels[clickedIndex];
+              updateDashboard();
+            }
+          }
+        }
+      });
+      {% endif %}
+      }
+    </script>
+  </body>
+</html>

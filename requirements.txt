@@ -1,6 +1,7 @@
 # 核心框架
 Flask==2.3.3
 Flask-WTF==1.2.1
+gunicorn==23.0.0  # 添加这一行
 
 # 数据处理
 pandas==2.1.4
